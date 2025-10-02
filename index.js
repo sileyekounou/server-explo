@@ -5,6 +5,9 @@ import errorHandler from '#middlewares/errorHandler';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser';
+import cron from "node-cron";
+import { cleanupExpiredSessions } from "#jobs/cleanup-sessions";
 
 
 // Import des routes principales
@@ -25,6 +28,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(cookieParser())
+
 // Parsing du body
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -43,6 +48,11 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
+});
+
+cron.schedule("0 * * * *", async () => {
+  console.log("🕐 Lancement du nettoyage des sessions...");
+  await cleanupExpiredSessions();
 });
 
 // ================================
@@ -72,6 +82,16 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+if (process.env.NODE_ENV === "development") {
+  app.post("/api/admin/cleanup-sessions", async (req, res) => {
+    const count = await cleanupExpiredSessions();
+    res.json({
+      success: true,
+      message: `${count} session(s) supprimée(s)`,
+    });
+  });
+}
 
 // Routes API
 // app.use('/api/auth', authRoutes);
