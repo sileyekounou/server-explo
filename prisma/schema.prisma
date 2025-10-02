@@ -1,0 +1,149 @@
+// Schema Prisma optimisé pour Better-auth + système custom
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// MODÈLES BETTER-AUTH (structure standard)
+// ========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique @db.VarChar(255)
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Identité utilisateur
+  firstName     String    @db.VarChar(100)
+  lastName      String    @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+
+  // Status compte
+  isActive      Boolean   @default(true)
+
+  // OTP (One-Time Password)
+  otpCode            String?   @db.VarChar(6)
+  otpExpires         DateTime?
+  otpAttempts        Int       @default(0)
+  otpLocked          Boolean   @default(false)
+  otpLockedUntil     DateTime?
+
+  // Sécurité connexion
+  loginAttempts      Int       @default(0)
+  lockUntil          DateTime?
+  lastLogin          DateTime?
+  lastLoginIP        String?   @db.VarChar(45) // Support IPv6
+
+  // Reset mot de passe
+  passwordResetToken   String?   @unique @db.VarChar(64)
+  passwordResetExpires DateTime?
+
+  // Vérification email
+  emailVerificationToken   String?   @unique @db.VarChar(64)
+  emailVerificationExpires DateTime?
+
+  // Relations
+  accounts Account[]
+  sessions Session[]
+  roles    UserRole[]
+
+  @@index([email])
+  @@index([emailVerificationToken])
+  @@index([passwordResetToken])
+  @@index([lastLogin])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String  @default("email")
+  provider          String  // Nom du provider (credential, google, etc.)
+  providerId        String?  // ID du provider
+  providerAccountId String  // ID du compte chez le provider
+  password          String? // Password hashé (pour provider credential)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @db.VarChar(255)
+  userId       String
+  expires      DateTime
+  ipAddress    String?  @db.VarChar(45)
+  userAgent    String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expires])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique @db.VarChar(255)
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ========================================
+// SYSTÈME DE RÔLES & PERMISSIONS
+// ========================================
+
+model Role {
+  id          String     @id @default(cuid())
+  name        String     @unique @db.VarChar(50)
+  description String?    @db.VarChar(255)
+  permissions Json?      // Stockage flexible des permissions
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  users UserRole[]
+
+  @@index([name])
+  @@map("roles")
+}
+
+model UserRole {
+  id         String   @id @default(cuid())
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  assignedBy String?  // ID de l'admin qui a assigné le rôle
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
