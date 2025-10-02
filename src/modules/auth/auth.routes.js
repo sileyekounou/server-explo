@@ -1,6 +1,6 @@
 import express from "express";
 import { authController } from "#modules/auth/auth.controller";
-import { requireAuth } from "#middlewares/auth.middleware";
+import { requireAuth, requireAuthWithRenewal } from "#middlewares/auth.middleware";
 
 const router = express.Router();
 
@@ -41,5 +41,6 @@ router.post("/otp/verify", authController.verifyOTP);
 
 // Profil utilisateur connecté
 router.get("/me", requireAuth, authController.getMe);
+// router.get("/me", requireAuthWithRenewal, authController.getMe);
 
 export default router;

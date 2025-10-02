@@ -43,69 +43,192 @@ class AuthService {
   // ========================================
   // CONNEXION
   // ========================================
+  // async signIn({ email, password, ip, userAgent, headers }) {
+  //   // Vérifier si le compte est verrouillé
+  //   const isLocked = await authUtils.isAccountLocked(email);
+  //   if (isLocked) {
+  //     throw new Error("Compte temporairement verrouillé. Réessayez plus tard.");
+  //   }
+
+  //   try {
+  //     // Tentative de connexion
+  //     const result = await auth.api.signInEmail({
+  //       body: { email, password },
+  //       headers,
+  //     });
+  //     console.log("Un souciiiiiiiis: ", result)
+
+  //     // Connexion réussie
+  //     if (result.user) {
+  //       await prisma.user.update({
+  //         where: { id: result.user.id },
+  //         data: {
+  //           lastLogin: new Date(),
+  //           lastLoginIP: ip,
+  //           loginAttempts: 0,
+  //           lockUntil: null,
+  //         },
+  //       });
+
+  //       // Mettre à jour la session avec l'IP et user agent
+  //       if (result.token) {
+  //         await prisma.session.updateMany({
+  //           where: {
+  //             userId: result.user.id,
+  //             sessionToken: result.session.sessionToken,
+  //           },
+  //           data: {
+  //             ipAddress: ip,
+  //             userAgent: userAgent,
+  //           },
+  //         });
+  //       } else {
+  //         console.log("Un souciiiiiiiis: ", result.session)
+  //       }
+
+  //       // if (result.token) {
+  //       //   await prisma.session.updateMany({
+  //       //     where: {
+  //       //       sessionToken: result.token,
+  //       //       userId: result.user.id,
+  //       //     },
+  //       //     data: {
+  //       //       ipAddress: ip,
+  //       //       userAgent: userAgent,
+  //       //     },
+  //       //   });
+  //       // }
+
+  //     }
+
+  //     console.log("Result:", result)
+
+  //     return result;
+  //   } catch (error) {
+  //     // Gérer tentative échouée
+  //     await authUtils.handleFailedLogin(email);
+  //     throw error;
+  //   }
+  // }
+
+  // Dans auth.service.js - méthode signIn
+
+// async signIn({ email, password, ip, userAgent, headers }) {
+//   const isLocked = await authUtils.isAccountLocked(email);
+//   if (isLocked) {
+//     throw new Error("Compte temporairement verrouillé. Réessayez plus tard.");
+//   }
+
+//   try {
+//     // 1. Connexion
+//     const result = await auth.api.signInEmail({
+//       body: { email, password },
+//       headers,
+//     });
+
+//     if (result.user) {
+//       // 2. Récupérer la session créée
+//       const sessionData = await auth.api.getSession({ headers });
+
+//       // 3. Mettre à jour l'utilisateur
+//       await prisma.user.update({
+//         where: { id: result.user.id },
+//         data: {
+//           lastLogin: new Date(),
+//           lastLoginIP: ip,
+//           loginAttempts: 0,
+//           lockUntil: null,
+//         },
+//       });
+
+//       // 4. Mettre à jour la session avec IP/userAgent
+//       if (sessionData?.session?.sessionToken) {
+//         await prisma.session.updateMany({
+//           where: {
+//             userId: result.user.id,
+//             sessionToken: sessionData.session.sessionToken,
+//           },
+//           data: {
+//             ipAddress: ip,
+//             userAgent: userAgent,
+//           },
+//         });
+//       }
+
+//       // 5. Retourner user + session
+//       return {
+//         user: result.user,
+//         session: sessionData.session,
+//       };
+//     }
+
+//     throw new Error("Connexion échouée");
+//   } catch (error) {
+//     await authUtils.handleFailedLogin(email);
+//     throw error;
+//   }
+// }
+
+// Dans auth.service.js
+
   async signIn({ email, password, ip, userAgent, headers }) {
-    // Vérifier si le compte est verrouillé
     const isLocked = await authUtils.isAccountLocked(email);
     if (isLocked) {
       throw new Error("Compte temporairement verrouillé. Réessayez plus tard.");
     }
 
     try {
-      // Tentative de connexion
+      // 1. Connexion via Better-auth
       const result = await auth.api.signInEmail({
         body: { email, password },
         headers,
       });
-      console.log("Un souciiiiiiiis: ", result)
 
-      // Connexion réussie
-      if (result.user) {
-        await prisma.user.update({
-          where: { id: result.user.id },
-          data: {
-            lastLogin: new Date(),
-            lastLoginIP: ip,
-            loginAttempts: 0,
-            lockUntil: null,
-          },
-        });
-
-        // Mettre à jour la session avec l'IP et user agent
-        if (result.token) {
-          await prisma.session.updateMany({
-            where: {
-              userId: result.user.id,
-              sessionToken: result.session.sessionToken,
-            },
-            data: {
-              ipAddress: ip,
-              userAgent: userAgent,
-            },
-          });
-        } else {
-          console.log("Un souciiiiiiiis: ", result.session)
-        }
-
-        // if (result.token) {
-        //   await prisma.session.updateMany({
-        //     where: {
-        //       sessionToken: result.token,
-        //       userId: result.user.id,
-        //     },
-        //     data: {
-        //       ipAddress: ip,
-        //       userAgent: userAgent,
-        //     },
-        //   });
-        // }
-
+      if (!result.user) {
+        throw new Error("Connexion échouée");
       }
 
-      console.log("Result:", result)
+      // 2. Récupérer la session créée depuis la DB
+      const session = await prisma.session.findFirst({
+        where: {
+          userId: result.user.id,
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
 
-      return result;
+      if (!session) {
+        throw new Error("Erreur lors de la création de la session");
+      }
+
+      // 3. Mettre à jour la session avec IP/userAgent
+      await prisma.session.update({
+        where: { id: session.id },
+        data: {
+          ipAddress: ip,
+          userAgent: userAgent,
+        },
+      });
+
+      // 4. Mettre à jour l'utilisateur
+      await prisma.user.update({
+        where: { id: result.user.id },
+        data: {
+          lastLogin: new Date(),
+          lastLoginIP: ip,
+          loginAttempts: 0,
+          lockUntil: null,
+        },
+      });
+
+      // 5. Retourner user + sessionToken
+      return {
+        user: result.user,
+        sessionToken: session.sessionToken,
+      };
+
     } catch (error) {
-      // Gérer tentative échouée
       await authUtils.handleFailedLogin(email);
       throw error;
     }
@@ -114,8 +237,12 @@ class AuthService {
   // ========================================
   // DÉCONNEXION
   // ========================================
-  async signOut(headers) {
-    await auth.api.signOut({ headers });
+  async signOut(sessionToken) {
+    if (!sessionToken) return;
+    
+    await prisma.session.deleteMany({
+      where: { sessionToken }
+    });
   }
 
   // ========================================

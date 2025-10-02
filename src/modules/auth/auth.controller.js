@@ -1,4 +1,7 @@
 import { authService } from "#modules/auth/auth.service";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 class AuthController {
   // ========================================
@@ -40,64 +43,129 @@ class AuthController {
   // ========================================
   // CONNEXION
   // ========================================
-  async signIn(req, res) {
-    try {
-      const { email, password } = req.body;
+  // async signIn(req, res) {
+  //   try {
+  //     const { email, password } = req.body;
 
-      if (!email || !password) {
-        return res.status(400).json({
-          success: false,
-          message: "Email et mot de passe requis",
-        });
-      }
+  //     if (!email || !password) {
+  //       return res.status(400).json({
+  //         success: false,
+  //         message: "Email et mot de passe requis",
+  //       });
+  //     }
 
-      const ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip;
-      const userAgent = req.headers["user-agent"] || "Unknown";
+  //     const ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip;
+  //     const userAgent = req.headers["user-agent"] || "Unknown";
 
-      const result = await authService.signIn({
-        email,
-        password,
-        ip,
-        userAgent,
-        headers: req.headers,
-      });
+  //     const result = await authService.signIn({
+  //       email,
+  //       password,
+  //       ip,
+  //       userAgent,
+  //       headers: req.headers,
+  //     });
 
-      res.status(200).json({
-        success: true,
-        message: "Connexion réussie",
-        user: result.user,
-        session: result.session,
-      });
-    } catch (error) {
-      res.status(401).json({
+  //     res.status(200).json({
+  //       success: true,
+  //       message: "Connexion réussie",
+  //       user: result.user,
+  //       session: result.session,
+  //     });
+  //   } catch (error) {
+  //     res.status(401).json({
+  //       success: false,
+  //       message: error.message || "Email ou mot de passe incorrect",
+  //     });
+  //   }
+  // }
+
+  // Dans auth.controller.js
+
+async signIn(req, res) {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
         success: false,
-        message: error.message || "Email ou mot de passe incorrect",
+        message: "Email et mot de passe requis",
       });
     }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip;
+    const userAgent = req.headers["user-agent"] || "Unknown";
+
+    const result = await authService.signIn({
+      email,
+      password,
+      ip,
+      userAgent,
+      headers: req.headers,
+    });
+
+    // 🔥 Définir manuellement le cookie de session
+    res.cookie("auth.session_token", result.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
+      path: "/",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Connexion réussie",
+      user: result.user,
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: error.message || "Email ou mot de passe incorrect",
+    });
   }
+}
 
   // ========================================
   // DÉCONNEXION
   // ========================================
   async signOut(req, res) {
     try {
-      await authService.signOut(req.headers);
+      const sessionToken = req.cookies?.["auth.session_token"];
+
+      if (sessionToken) {
+        // 🔥 Appeler le service avec le sessionToken
+        await authService.signOut(sessionToken);
+      }
+
+      // Supprimer le cookie
+      res.clearCookie("auth.session_token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
 
       res.status(200).json({
         success: true,
         message: "Déconnexion réussie",
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        message: error.message,
+      console.error("Erreur signOut:", error);
+      
+      // Toujours supprimer le cookie
+      res.clearCookie("auth.session_token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: "Déconnexion réussie",
       });
     }
   }
-
-  // ========================================
-  // SESSION
-  // ========================================
   async getSession(req, res) {
     try {
       const session = await authService.getSession(req.headers);
