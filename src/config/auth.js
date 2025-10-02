@@ -17,7 +17,7 @@ export const auth = betterAuth({
     requireEmailVerification: false, // Tu gères manuellement
     minPasswordLength: 8,
     maxPasswordLength: 128,
-    
+
     // IMPORTANT : Spécifier où stocker le password
     async onSignUp(data) {
       // Better-auth va gérer le hash automatiquement
@@ -53,11 +53,11 @@ export const auth = betterAuth({
       maxAge: 5 * 60, // Cache 5 minutes
     },
     fields: {
-    token: "sessionToken",
-    expiresAt: "expires",
-    ipAddress: "ipAddress",
-    userAgent: "userAgent",
-  },
+      token: "sessionToken",
+      expiresAt: "expires",
+      ipAddress: "ipAddress",
+      userAgent: "userAgent",
+    },
   },
 
   // ========================================
@@ -159,7 +159,7 @@ export const auth = betterAuth({
     fields: {
       // Better-auth envoie "accountId" -> ta colonne "providerAccountId"
       accountId: "providerAccountId",
-      
+
       // Better-auth envoie "providerId" -> ta colonne "provider"
       providerId: "provider",
     },
