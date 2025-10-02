@@ -22,7 +22,8 @@
     "#middlewares/*": "./src/middlewares/*.js",
     "#modules/*": "./src/modules/*.js",
     "#utils/*": "./src/utils/*.js",
-    "#routes": "./src/routes.js"
+    "#routes": "./src/routes.js",
+    "#jobs/*": "./src/jobs/*.js"
   },
   "keywords": [],
   "author": "",
@@ -38,6 +39,7 @@
     "bcrypt": "^6.0.0",
     "better-auth": "^1.3.24",
     "cloudinary": "^1.41.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
@@ -47,6 +49,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "multer-storage-cloudinary": "^4.0.0"
+    "multer-storage-cloudinary": "^4.0.0",
+    "node-cron": "^4.2.1"
   }
 }
